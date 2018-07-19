@@ -11,7 +11,7 @@ from keras.layers import Dense, LSTM
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 # fix random seed for reproducibility
-numpy.random.seed(27)
+np.random.seed(27)
 
 
 # Smash Ultimate Blog Predictor
