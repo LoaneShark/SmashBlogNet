@@ -14,10 +14,11 @@ from keras.layers import Dense, LSTM
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
+from sklearn.exceptions import NotFittedError
 # fix random seed for reproducibility
 #np.random.seed(27)
 
-verbosity = 2
+verbosity = 1
 
 # Smash Ultimate Blog Predictor
 def main():
@@ -107,6 +108,7 @@ def main():
 	# normalize dataset
 	scaler = MinMaxScaler(feature_range=(0,1))
 	scaled = scaler.fit_transform(dataset)
+	print(scaled.shape)
 	recent = scaled[-1]
 
 	# frame as supervised learning
@@ -160,11 +162,11 @@ def main():
 	model,hist = model_dataset(trainX,trainY,testX,testY)
 
 	# make predictions!
-	model_predict(model,testX,recent.reshape(1,1,n_features),scaler)
+	model_predict(model,testX,testY,recent.reshape(1,1,n_features),scaler,encoders,titles)
 	#model_predict(model,(trainX,trainY,testX,testY),scaler)
 
 # create and train the LSTM network
-def model_dataset(trainX,trainY,testX,testY,look_back=1):
+def model_dataset(trainX,trainY,testX,testY,look_back=1,plot_results=True):
 	if verbosity >= 1:
 		print("Generating model")
 
@@ -175,18 +177,18 @@ def model_dataset(trainX,trainY,testX,testY,look_back=1):
 	model.add(LSTM(20, input_shape=(look_back,n_feats)))
 	model.add(Dense(1))
 	model.compile(loss='mae',optimizer='adam')
-	history = model.fit(trainX,trainY,epochs=250,batch_size=1,validation_data=(testX,testY),verbose=2,shuffle=False)
+	history = model.fit(trainX,trainY,epochs=250,batch_size=1,validation_data=(testX,testY),verbose=0,shuffle=False)
 
 	# plot
-	plt.plot(history.history['loss'],label='train')
-	plt.plot(history.history['val_loss'], label='test')
-	plt.legend()
-	plt.show()
+	if plot_results:
+		plt.plot(history.history['loss'],label='train')
+		plt.plot(history.history['val_loss'], label='test')
+		plt.legend()
+		plt.show()
 
 	return model,history
 
-
-def model_predict(model,test_X,mostrecent,scaler):
+def model_predict(model,testX,testY,mostrecent,scaler,encoders,titles):
 	#(trainX,trainY,testX,testY) = datasets
 	#print(testX[-1].shape)
 	#print(testX[-1]*66)
@@ -195,45 +197,44 @@ def model_predict(model,test_X,mostrecent,scaler):
 	#predX = np.zeros((5,mostrecent.shape[1],mostrecent.shape[2]))
 	#predX[:] = mostrecent
 	#print(predX)
+
+	# calculate RSME
+	yhat = model.predict(testX,batch_size=1)
+	testX = testX.reshape((testX.shape[0],testX.shape[2]))
+	inv_yhat = np.concatenate((yhat, testX[:,1:]),axis=1)
+	inv_yhat = scaler.inverse_transform(inv_yhat)[:,0]
+
+	testY = testY.reshape((len(testY),1))
+	inv_y = np.concatenate((testY,testX[:,1:]),axis=1)
+	inv_y = scaler.inverse_transform(inv_y)[:,0]
+
+	rmse = np.sqrt(mean_squared_error(inv_y, inv_yhat))
+	print('Test RMSE: %.3f' %rmse)
+
+	# predict next fighter
 	predicted = model.predict(mostrecent,batch_size=1,verbose=1)
 	#print(predicted)
-	
-	mostrecent = scaler.
-	print("Last Posted Fighter: ",mostrecent[0,0])
+
+	mostrecent = scaler.inverse_transform(mostrecent[0])
+	last = np.zeros(len(titles),dtype='object')
+	for i in range(len(titles)):
+		feature = titles[i]
+		encoder = encoders[i]
+		print(i,": ",feature)
+		try:
+			last[i] = encoder.inverse_transform(mostrecent[0,i].astype(int))
+		except NotFittedError:
+			last[i] = mostrecent[0,i].astype(int)
+
+	#mostrecent = mostrecent.reshape((len(mostrecent),1))
+	print("Last Posted Fighter: \n",titles)
+	print(last)
 
 	pred_num = predicted[:,0]*66
 	pred_num = pred_num.astype(int)
 	
 	print("Next Predicted Fighter Number(s): ",pred_num)
-	return 8
-
-	# make predictions
-	trainPredict = model.predict(trainX)
-	testPredict = model.predict(testX)
-	# invert predictions
-	trainPredict = scaler.inverse_transform(trainPredict)
-	trainY = scaler.inverse_transform([trainY])
-	testPredict = scaler.inverse_transform(testPredict)
-	testY = scaler.inverse_transform([testY])
-	# calculate root mean squared error
-	trainScore = math.sqrt(mean_squared_error(trainY[0], trainPredict[:,0]))
-	print('Train Score: %.2f RMSE' % (trainScore))
-	testScore = math.sqrt(mean_squared_error(testY[0], testPredict[:,0]))
-	print('Test Score: %.2f RMSE' % (testScore))
-
-	# shift train predictions for plotting
-	trainPredictPlot = numpy.empty_like(dataset)
-	trainPredictPlot[:, :] = numpy.nan
-	trainPredictPlot[look_back:len(trainPredict)+look_back, :] = trainPredict
-	# shift test predictions for plotting
-	testPredictPlot = numpy.empty_like(dataset)
-	testPredictPlot[:, :] = numpy.nan
-	testPredictPlot[len(trainPredict)+(look_back*2)+1:len(dataset)-1, :] = testPredict
-	# plot baseline and predictions
-	plt.plot(scaler.inverse_transform(dataset))
-	plt.plot(trainPredictPlot)
-	plt.plot(testPredictPlot)
-	plt.show()
+	return rmse,pred_num
 
 def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
 	n_vars = 1 if type(data) is list else data.shape[1]
