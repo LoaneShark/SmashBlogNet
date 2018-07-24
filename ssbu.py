@@ -29,13 +29,14 @@ def main():
 
 	# clean up data and add in missing info
 	last = 0
-	blankday = np.array(["None",-1,None,-1,"None","None","None","None",-1,"None"])
-	#blankday = np.reshape(blankday,(1,10))
+	blankday = np.array(["None",-1,None,-1,"None","None","None","None",-1,"None","None"])
 
 	cleandata = np.zeros((1,data.shape[1]),dtype='object')
-	#print(cleandata.shape)
+	cleandata[0] = blankday
+	
+	# calculate weekday count for each post
+	# add in missing days with blankday placeholders
 	for fighter in data:
-		#print(fighter.shape)
 		fighter[2] = workdays(fighter[2],date(2018,6,12))*1.0
 		diff = fighter[2] - last
 		while diff >= 2:
@@ -57,69 +58,40 @@ def main():
 	for i in range(len(labels)):
 		labelkeys[labels[i]] = i
 	
-	#names = data[:,0]
-	## choose data columns we want
-	#data = data[:,1:] # ignore fighter names
-	#data = np.append(data[:,:2],data[:,3:],axis=1) # ignore days since E3
-	#labels = np.append(labels[1:3],labels[4:],axis=0)
-	
-	# split dataset into samples, timesteps, and features
-	#timesteps = data[:,1]
-	#samples = data[:,0]
-	#features = data[:,2:]
-	titles = ['Number','Series','Game Added','Game Count','3rd Party?','Newcomer?','Returning Vet?']
+	# select just the data columns we want, and reorder them
+	titles = ['Number','Type','Series','Game Added','Game Count','3rd Party?','Newcomer?','Returning Vet?']
 	features = np.array([data[:,labelkeys[title]] for title in titles],dtype='object')
 	features = np.array([features[:,i] for i in range(len(data))])
 	
 	if verbosity >= 4:
 		print(titles,"\n",features)
 
-	#temp = np.append(timesteps.reshape(-1,1),features,axis=1)
-	#data = np.append(samples.reshape(-1,1),temp,axis=1)
-	#labels = np.append([labels[0]],np.append([labels[1]],labels[2:]),axis=0)
 	labels = titles
-
 	if verbosity >= 3:
 		print(labels)
 		print(data)
-
-	## suppress warnings that my data started as ints and got converted to floats
-	#from sklearn.exceptions import DataConversionWarning
-	#warnings.filterwarnings(action='ignore', category=DataConversionWarning)
-	## rescale all data to be within [0,1], except timesteps
-	#scaler = MinMaxScaler(feature_range=(0,1))
-	#samples_norm = scaler.fit_transform(samples.reshape(-1,1))
-	#feature_norm = scaler.fit_transform(features)
-
-	# assemble database to be [samples,timesteps,features]
-	#dataraw = np.append(samples.reshape(-1,1), timesteps.reshape(-1,1),axis=1)
-	#dataset = np.zeros([len(dataraw),3],dtype='object')
-	#for i in range(len(dataraw)):
-	#	dataset[i,:2] = dataraw[i]
-	#	dataset[i,2] = features[i]
-	#print(features.shape)
-	#dataset = features.reshape(1,features.shape[0],features.shape[1])
 	dataset = np.copy(features)
 
 	# encode nominal data to numerical values
 	dataset,encoders = encode_dataset(dataset,titles)
 	n_features = features.shape[1]
 
-	# normalize dataset
+	# suppress warnings that my data started as ints and got converted to floats
+	from sklearn.exceptions import DataConversionWarning
+	warnings.filterwarnings(action='ignore', category=DataConversionWarning)
+	# normalize dataset so all features are within [0,1]
 	scaler = MinMaxScaler(feature_range=(0,1))
 	scaled = scaler.fit_transform(dataset)
-	print(scaled.shape)
+	# save last fighter for predicting next one
 	recent = scaled[-1]
 
 	# frame as supervised learning
 	dataset = series_to_supervised(scaled,1,1)
 
 	# drop columns that don't matter
-	# (everything except fighter number)
+	# (everything except fighter number for output)
 	dataset.drop(dataset.columns[range(n_features+1,2*n_features)],axis=1, inplace=True)
 	#print(dataset.head())
-
-	#return 8
 
 	if verbosity >= 2:
 		print("PROCESSED DATASET:\n",dataset)
@@ -135,21 +107,11 @@ def main():
 		print("Train size: " + str(len(train)))
 		print("Test size: " + str(len(test)))
 
+	# organize into [samples,timesteps,features] like keras wants
 	trainX, trainY = create_dataset(train, 1)
 	testX, testY = create_dataset(test, 1)
-	#trainX = trainX[:,0] # clean up data for some reason
-	#trainX = trainX.reshape(1,train_size,n_features)
-	#temptrain = np.zeros([trainX.shape[1],trainX.shape[0],trainX.shape[2]],dtype='object')
-	#temptrain[0] = np.array([vec for vec in trainX[:,0]],dtype='object')
-	#trainX = np.copy(temptrain)
 
-	#temptest = np.zeros([testX.shape[1],testX.shape[0],testX.shape[2]],dtype='object')
-	#temptest[0] = np.array([vec for vec in testX[:,0]],dtype='object')
-	#testX = np.copy(temptest)
-	#print(testX.shape)
-	#testX = testX[:,0]
-	#testX = testX.reshape(-1,1)
-
+	# separate inputs and outputs
 	trainX = trainX[:,:,:-1]
 	testX = testX[:,:,:-1]
 	trainY = trainY.reshape(-1)
@@ -163,7 +125,6 @@ def main():
 
 	# make predictions!
 	model_predict(model,testX,testY,recent.reshape(1,1,n_features),scaler,encoders,titles)
-	#model_predict(model,(trainX,trainY,testX,testY),scaler)
 
 # create and train the LSTM network
 def model_dataset(trainX,trainY,testX,testY,look_back=1,plot_results=True):
@@ -189,14 +150,6 @@ def model_dataset(trainX,trainY,testX,testY,look_back=1,plot_results=True):
 	return model,history
 
 def model_predict(model,testX,testY,mostrecent,scaler,encoders,titles):
-	#(trainX,trainY,testX,testY) = datasets
-	#print(testX[-1].shape)
-	#print(testX[-1]*66)
-	#print(mostrecent.shape)
-	#print(mostrecent*66)
-	#predX = np.zeros((5,mostrecent.shape[1],mostrecent.shape[2]))
-	#predX[:] = mostrecent
-	#print(predX)
 
 	# calculate RSME
 	yhat = model.predict(testX,batch_size=1)
@@ -220,7 +173,10 @@ def model_predict(model,testX,testY,mostrecent,scaler,encoders,titles):
 	for i in range(len(titles)):
 		feature = titles[i]
 		encoder = encoders[i]
-		print(i,": ",feature)
+		#print(i,": ",feature)
+
+		# suppress warnings caused by sklearn bug
+		warnings.filterwarnings(action='ignore',category=DeprecationWarning)
 		try:
 			last[i] = encoder.inverse_transform(mostrecent[0,i].astype(int))
 		except NotFittedError:
@@ -228,7 +184,7 @@ def model_predict(model,testX,testY,mostrecent,scaler,encoders,titles):
 
 	#mostrecent = mostrecent.reshape((len(mostrecent),1))
 	print("Last Posted Fighter: \n",titles)
-	print(last)
+	print(" ",last)
 
 	pred_num = predicted[:,0]*66
 	pred_num = pred_num.astype(int)
@@ -262,13 +218,11 @@ def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
 def encode_dataset(data,labels):
 	if verbosity >= 1:
 		print("Encoding dataset...")
-	#print(data)
-	#print(labels)
+
 	encoders = [LabelEncoder() for i in range(len(labels))]
 	dataset = np.copy(data)
 	for i in range(len(labels)):
-		#feature = labels[i]
-		#print(feature)
+
 		item = data[0,i]
 		if type(item) is not float:
 			if type(item) is int:
@@ -314,8 +268,8 @@ def parsecsv(data,n):
 	cleandata = np.zeros([1,n])
 	_date = lambda x: datetime.strptime(x, "%m/%d/%y").date()
 	_bool = lambda x: True if x == "True" else False
-	#parsers = [str,int,_date,int,str,_bool,_bool,_bool,int,str]
-	parsers = [str,int,_date,int,str,str,str,str,int,str]
+	#parsers = [str,int,_date,int,str,_bool,_bool,_bool,int,str,str]
+	parsers = [str,int,_date,int,str,str,str,str,int,str,str]
 
 	for fighter in data:
 		parsed = [parse(inp) for parse,inp in zip(parsers,fighter)]
