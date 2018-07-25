@@ -36,6 +36,7 @@ def main():
 	
 	# calculate weekday count for each post
 	# add in missing days with blankday placeholders
+	today = datetime.datetime.now()
 	for fighter in data:
 		fighter[2] = workdays(fighter[2],date(2018,6,12))*1.0
 		diff = fighter[2] - last
@@ -44,9 +45,15 @@ def main():
 			tempday = np.copy(blankday)
 			tempday[2] = fighter[2] - diff
 			#print(tempday.shape)
-			cleandata = np.append(cleandata, [tempday], axis=0)
+			cleandata = np.append(cleandata,[tempday],axis=0)
 		cleandata = np.append(cleandata,[fighter],axis=0)
 		last = fighter[2]
+	last = cleandata[-1,2]
+	padcount = workdays(today)-last
+	for i in range(1,padcount):
+		tempday = np.copy(blankday)
+		tempday[2] = last+i
+		cleandata = np.append(cleandata,[tempday],axis=0)
 
 	data = cleandata[1:]
 	if verbosity >= 3:
