@@ -19,25 +19,26 @@ from sklearn.exceptions import NotFittedError
 #np.random.seed(27)
 
 verbosity = 1
+fighter_post = False
 
 # Smash Ultimate Blog Predictor
 def main():
 	# import data
-	labels,data = readin()
+	labels,fighters,others = readin()
 	if verbosity >= 1:
-		print("Analyzing %d fighters..." %(len(data)))
+		print("Analyzing %d fighters..." %(len(fighters)))
 
 	# clean up data and add in missing info
 	last = 0
 	blankday = np.array(["None",-1,None,-1,"None","None","None","None",-1,"None","None"])
 
-	cleandata = np.zeros((1,data.shape[1]),dtype='object')
+	cleandata = np.zeros((1,fighters.shape[1]),dtype='object')
 	cleandata[0] = blankday
 	
 	# calculate weekday count for each post
 	# add in missing days with blankday placeholders
 	today = date.today()
-	for fighter in data:
+	for fighter in fighters:
 		fighter[2] = workdays(fighter[2],date(2018,6,12))*1.0
 		diff = fighter[2] - last
 		while diff >= 2:
@@ -48,13 +49,16 @@ def main():
 			cleandata = np.append(cleandata,[tempday],axis=0)
 		cleandata = np.append(cleandata,[fighter],axis=0)
 		last = fighter[2]
+	# pad missing days since last blog post 
 	last = cleandata[-1,2]
 	padcount = int(workdays(today)-last)
-	print(last, padcount)
 	for i in range(1,padcount):
 		tempday = np.copy(blankday)
 		tempday[2] = last+i
 		cleandata = np.append(cleandata,[tempday],axis=0)
+
+	# calculate weekday count for each non-fighter post
+	## TODO 
 
 	data = cleandata[1:]
 	if verbosity >= 3:
@@ -97,9 +101,14 @@ def main():
 	dataset = series_to_supervised(scaled,1,1)
 
 	# drop columns that don't matter
-	# (everything except fighter number for output)
-	dataset.drop(dataset.columns[range(n_features+1,2*n_features)],axis=1, inplace=True)
-	#print(dataset.head())
+	if (fighter_post):
+		# drop all outputs except fighter number
+		dataset.drop(dataset.columns[range(n_features+1,2*n_features)],axis=1, inplace=True)
+	else:
+		# drop all outputs except post type & series
+		dataset.drop(dataset.columns[range(n_features+3,2*n_features)],axis=1, inplace=True)
+		dataset.drop(dataset.columns[n_features],axis=1, inplace=True)
+	print(dataset.head())
 
 	if verbosity >= 2:
 		print("PROCESSED DATASET:\n",dataset)
@@ -120,33 +129,42 @@ def main():
 	testX, testY = create_dataset(test, 1)
 
 	# separate inputs and outputs
-	trainX = trainX[:,:,:-1]
-	testX = testX[:,:,:-1]
-	trainY = trainY.reshape(-1)
-	testY = testY.reshape(-1)
+	if fighter_post:
+		trainX = trainX[:,:,:-1]
+		testX = testX[:,:,:-1]
+	else:
+		trainX = trainX[:,:,:-2]
+		testX = testX[:,:,:-2]
+	trainY = trainY.reshape(-1,2)
+	testY = testY.reshape(-1,2)
 	if verbosity >= 2:
 		print("trainX: ",trainX.shape,"\n",trainX)
 		print("trainY: ",trainY.shape,"\n",trainY)
 	
+	#inp_n = trainX.shape[2]
+
 	# model LSTM network
-	model,hist = model_dataset(trainX,trainY,testX,testY)
+	model,hist = model_dataset(trainX,trainY,testX,testY,n_features)
 
 	# make predictions!
 	model_predict(model,testX,testY,recent.reshape(1,1,n_features),scaler,encoders,titles)
 
 # create and train the LSTM network
-def model_dataset(trainX,trainY,testX,testY,look_back=1,plot_results=True):
+def model_dataset(trainX,trainY,testX,testY,n_feats,look_back=1,plot_results=True):
 	if verbosity >= 1:
 		print("Generating model")
 
-	n_feats = trainX.shape[2]
+	#n_feats = trainX.shape[2]
 
 	# generate and train network
 	model = Sequential()
 	model.add(LSTM(20, input_shape=(look_back,n_feats)))
-	model.add(Dense(1))
+	if fighter_post:
+		model.add(Dense(1))
+	else:
+		model.add(Dense(2))
 	model.compile(loss='mae',optimizer='adam')
-	history = model.fit(trainX,trainY,epochs=250,batch_size=1,validation_data=(testX,testY),verbose=0,shuffle=False)
+	history = model.fit(trainX,trainY,epochs=150,batch_size=1,validation_data=(testX,testY),verbose=0,shuffle=False)
 
 	# plot
 	if plot_results:
@@ -158,25 +176,37 @@ def model_dataset(trainX,trainY,testX,testY,look_back=1,plot_results=True):
 	return model,history
 
 def model_predict(model,testX,testY,mostrecent,scaler,encoders,titles):
+	calc_rmse = False
 
-	# calculate RSME
-	yhat = model.predict(testX,batch_size=1)
-	testX = testX.reshape((testX.shape[0],testX.shape[2]))
-	inv_yhat = np.concatenate((yhat, testX[:,1:]),axis=1)
-	inv_yhat = scaler.inverse_transform(inv_yhat)[:,0]
+	if calc_rmse:
+		# calculate RSME
+		yhat = model.predict(testX,batch_size=1)
+		testX = testX.reshape((testX.shape[0],testX.shape[2]))
+		inv_yhat = np.concatenate((yhat, testX[:,1:]),axis=1)
+		inv_yhat = scaler.inverse_transform(inv_yhat)[:,0]
 
-	testY = testY.reshape((len(testY),1))
-	inv_y = np.concatenate((testY,testX[:,1:]),axis=1)
-	inv_y = scaler.inverse_transform(inv_y)[:,0]
+		testY = testY.reshape((len(testY),1))
+		inv_y = np.concatenate((testY,testX[:,1:]),axis=1)
+		inv_y = scaler.inverse_transform(inv_y)[:,0]
 
-	rmse = np.sqrt(mean_squared_error(inv_y, inv_yhat))
-	print('Test RMSE: %.3f' %rmse)
+		rmse = np.sqrt(mean_squared_error(inv_y, inv_yhat))
+		print('Test RMSE: %.3f' %rmse)
+	else:
+		rmse = -999
 
 	# predict next fighter
 	predicted = model.predict(mostrecent,batch_size=1,verbose=1)
-	#print(predicted)
+	if not fighter_post:
+		# pad with dummy values so it can be descaled
+		dummy = np.append([1],predicted[0],axis=0)
+		dummy = np.append(dummy,[0,0,0,0,0],axis=0)
+		#print(dummy)
+		dummy = scaler.inverse_transform([dummy])
+		predicted = dummy[0,1:3]
+		#print(predicted)
 
 	mostrecent = scaler.inverse_transform(mostrecent[0])
+	#print(mostrecent)
 	last = np.zeros(len(titles),dtype='object')
 	for i in range(len(titles)):
 		feature = titles[i]
@@ -185,6 +215,8 @@ def model_predict(model,testX,testY,mostrecent,scaler,encoders,titles):
 
 		# suppress warnings caused by sklearn bug
 		warnings.filterwarnings(action='ignore',category=DeprecationWarning)
+		#if not fighter_post and (feature == "Series" or feature == "Type"):
+		#	predicted[i] = encoder.inverse_transform(predicted[i].astype(int))
 		try:
 			last[i] = encoder.inverse_transform(mostrecent[0,i].astype(int))
 		except NotFittedError:
@@ -194,11 +226,18 @@ def model_predict(model,testX,testY,mostrecent,scaler,encoders,titles):
 	print("Last Posted Fighter: \n",titles)
 	print(" ",last)
 
-	pred_num = predicted[:,0]*66
-	pred_num = pred_num.astype(int)
-	
-	print("Next Predicted Fighter Number(s): ",pred_num)
-	return rmse,pred_num
+	if fighter_post:
+		pred_num = predicted[:,0]*66
+		pred_num = pred_num.astype(int)
+		
+		print("Next Predicted Fighter(s): ",pred_num)
+		return rmse,pred_num
+	else:
+		res = np.array([0,0],dtype='object')
+		res[0] = encoders[1].inverse_transform(predicted[0].astype(int))
+		res[1] = encoders[2].inverse_transform(predicted[1].astype(int))
+		print("Prediction: ",res)
+		return rmse,res
 
 def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
 	n_vars = 1 if type(data) is list else data.shape[1]
@@ -243,32 +282,45 @@ def encode_dataset(data,labels):
 def create_dataset(dataset, look_back=1):
 	dataX, dataY = [],[]
 
+	if fighter_post:
+		y_dim = 1
+	else:
+		y_dim = 2
+
 	for i in range(len(dataset)-look_back-1):
 		a = dataset[i:(i+look_back),:]
 
 		dataX.append(a)
-		dataY.append(dataset[i + look_back, 0])
-	return np.array(dataX), np.array(dataY).reshape(1,len(dataY))
+		if fighter_post:
+			dataY.append(dataset[i+look_back,0])
+		else:
+			dataY.append(dataset[i+look_back,1:3])
+	return np.array(dataX), np.array(dataY).reshape(y_dim,len(dataY))
 
 # reads in specified data csv and returns a
 # 	numpy array containing the cleaned data
 # 	and another containing the labels
-def readin(filepath='blogdata.csv'):
-	data = []
+def readin(fighterpath='blogdata.csv',itempath='itemdata.csv'):
+	data, items = [], []
 
 	# open file
-	with open(filepath) as csvfile:
+	with open(fighterpath) as csvfile:
 		datareader = csv.reader(csvfile)
 		for fighter in datareader:
 			data.append(fighter)
-
+	with open(itempath) as itemfile:
+		itemreader = csv.reader(itemfile)
+		for post in itemreader:
+			items.append(post)
 	labels = data[0]
 	n = len(labels)
 	data = data[1:]
+	items = items[1:]
 
 	# ready to use data 
 	data = parsecsv(data,n)
-	return np.array(labels),data
+	other = parsecsv(items,n)
+	return np.array(labels),data,other
 
 # cleans CSV and assigns proper data types
 # returns numpy array of data vectors, without labels
