@@ -12,7 +12,7 @@ import pandas
 from pandas import DataFrame
 from pandas import concat
 from keras.models import Sequential
-from keras.layers import Dense, LSTM
+from keras.layers import Dense, LSTM, TimeDistributed, Embedding
 import keras.activations as ka
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
@@ -223,16 +223,18 @@ def model_dataset(trainX,trainY,testX,testY,n_feats,look_back=1,plot_results=Tru
 		print("Generating model")
 
 	#n_feats = trainX.shape[2]
-
+	hidden = 20
 	# generate and train network
 	model = Sequential()
-	model.add(LSTM(20, input_shape=(look_back,n_feats)))
-	#model.add(LSTM(20, input_shape=(look_back,n_feats)))
+	#model.add(LSTM(hidden, input_shape=(look_back,n_feats),return_sequences=True))
+	model.add(LSTM(hidden, input_shape=(look_back,n_feats)))
 	if fighter_post:
 		model.add(Dense(1,activation=args.activation))
 	else:
+		#model.add(TimeDistributed(Dense(2,activation=args.activation),input_shape=(look_back,n_feats)))
 		model.add(Dense(2,activation=args.activation))
-	model.compile(loss='mae',optimizer='adam')
+	#model.compile(loss='mae',optimizer='adam')
+	model.compile(loss='categorical_crossentropy',optimizer='adam',metrics=['categorical_accuracy'])
 	history = model.fit(trainX,trainY,epochs=args.epochs,batch_size=args.batch_size,validation_data=(testX,testY),verbose=min([int(verbosity/2),1]),shuffle=False)
 
 	# plot
@@ -430,6 +432,8 @@ if __name__ == "__main__":
 	results = np.zeros([1,2],dtype='str')
 	# aggregate results
 	for n in range(args.n_runs):
+		if n%10 == 0 and n>0:
+			print(n)
 		results = np.append(results,[main()],axis=0)
 	results = results[1:]
 
