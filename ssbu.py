@@ -1,9 +1,11 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
 import scipy as sp 
+import argparse
 import csv
 import math
 from datetime import datetime,date,timedelta
+import calendar
 import warnings
 # NN imports
 import pandas
@@ -15,16 +17,38 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.exceptions import NotFittedError
-# fix random seed for reproducibility
-#np.random.seed(27)
 
-verbosity = 1
-fighter_post = False
+parser = argparse.ArgumentParser()
+parser.add_argument('-v','--verbosity',type=int,default=0)
+parser.add_argument('-b','--batch_size',type=int,default=1)
+parser.add_argument('-e','--epochs',type=int,default=250)
+parser.add_argument('-l','--lag',type=int,default=1)
+parser.add_argument('-r','--seed',type=int,default=-1)
+parser.add_argument('-n','--runs',type=int,default=1)
+parser.add_argument('-f','--fighter_post',action='store_true')
+parser.add_argument('-d','--day_of_week',action='store_true')
+parser.add_argument('-p','--plot',action='store_true')
+parser.add_argument('-s','--supervised',action='store_true')
+parser.add_argument('-c','--calc_error',action='store_true')
+args = parser.parse_args()
+#print(args.verbosity)
+
+# fix random seed for reproducibility
+if args.seed >= 0:
+	#np.random.seed(27)
+	np.random.seed(args.seed)
+
+verbosity = args.verbosity
+fighter_post = args.fighter_post
+day_of_week = args.day_of_week
+is_supervised = args.supervised
 
 # Smash Ultimate Blog Predictor
 def main():
 	# import data
 	labels,fighters,others = readin()
+	if day_of_week:
+		labels = np.append(labels,["Day of the Week"])
 	if verbosity >= 1:
 		print("Analyzing %d fighters..." %(len(fighters)))
 
@@ -32,19 +56,28 @@ def main():
 	last = 0
 	blankday = np.array(["None",-1,None,-1,"None","None","None","None",-1,"None","None"])
 
-	cleandata = np.zeros((1,fighters.shape[1]),dtype='object')
-	cleandata[0] = blankday
+	if day_of_week:
+		cleandata = np.zeros((1,fighters.shape[1]+1),dtype='object')
+		cleandata[0] = np.append(blankday,["None"])
+	else:
+		cleandata = np.zeros((1,fighters.shape[1]),dtype='object')
+		cleandata[0] = np.copy(blankday)
 	
 	# calculate weekday count for each post
 	# add in missing days with blankday placeholders
 	today = date.today()
 	for fighter in fighters:
+		if day_of_week:
+			day_i = fighter[2].weekday()
+			fighter = np.append(fighter,[calendar.day_name[day_i]])
 		fighter[2] = workdays(fighter[2],date(2018,6,12))*1.0
 		diff = fighter[2] - last
 		while diff >= 2:
 			diff = diff-1
 			tempday = np.copy(blankday)
 			tempday[2] = fighter[2] - diff
+			if day_of_week:
+				tempday = np.append(tempday,[calendar.day_name[int((day_i-diff)%7)]])
 			#print(tempday.shape)
 			cleandata = np.append(cleandata,[tempday],axis=0)
 		cleandata = np.append(cleandata,[fighter],axis=0)
@@ -55,23 +88,42 @@ def main():
 	for i in range(1,padcount):
 		tempday = np.copy(blankday)
 		tempday[2] = last+i
+		if day_of_week:
+			tempday = tempday.append(tempday,[calendar.day_name[(day_i+i)%7]])
 		cleandata = np.append(cleandata,[tempday],axis=0)
 
 	# calculate weekday count for each non-fighter post
-	## TODO 
+	## TODO: Figure out how to integrate this with fighter posts
+	if day_of_week:
+		others = np.array([np.append(item,[calendar.day_name[item[2].weekday()]]) for item in others])
+	others = np.array([np.append(item[:2],np.append([workdays(item[2],date(2018,6,12))*1.0],item[3:])) for item in others])
+	#print(others)
+	for idx in range(len(cleandata)):
+		if cleandata[idx,0] == "None":
+			#print(line)
+			temp = np.array([item for item in others if item[2] == cleandata[idx,2]])
+			if temp.size>0:
+				#print(temp)
+				cleandata[idx] = np.array(temp[0])
+
+	#cleandata = [np.array([item for item in others if item[2] == line[2]]) for line in cleandata if line[0]=="None"]
+	#print(cleandata)
 
 	data = cleandata[1:]
 	if verbosity >= 3:
 		print(data.shape,data)
 
-	labels[2] = 'Weekdays since E3'
+	labels[2] = 'Weekdays since'
 	# establish mapping for labels to their index
 	labelkeys = {}
 	for i in range(len(labels)):
 		labelkeys[labels[i]] = i
 	
 	# select just the data columns we want, and reorder them
-	titles = ['Number','Type','Series','Game Added','Game Count','3rd Party?','Newcomer?','Returning Vet?']
+	if day_of_week:
+		titles = ['Number','Type','Series','Day of the Week','Weekdays since','Game Added','Game Count','3rd Party?','Newcomer?','Returning Vet?']
+	else:
+		titles = ['Number','Type','Series','Weekdays since','Game Added','Game Count','3rd Party?','Newcomer?','Returning Vet?']
 	features = np.array([data[:,labelkeys[title]] for title in titles],dtype='object')
 	features = np.array([features[:,i] for i in range(len(data))])
 	
@@ -79,9 +131,9 @@ def main():
 		print(titles,"\n",features)
 
 	labels = titles
-	if verbosity >= 3:
-		print(labels)
-		print(data)
+	#if verbosity >= 3:
+	#	print(labels)
+	#	print(data)
 	dataset = np.copy(features)
 
 	# encode nominal data to numerical values
@@ -95,19 +147,22 @@ def main():
 	scaler = MinMaxScaler(feature_range=(0,1))
 	scaled = scaler.fit_transform(dataset)
 	# save last fighter for predicting next one
-	recent = scaled[-1]
+	recent = scaled[-(args.lag):]
+	#print(recent)
 
 	# frame as supervised learning
-	dataset = series_to_supervised(scaled,1,1)
+	dataset = series_to_supervised(scaled,args.lag,1)
 
-	# drop columns that don't matter
-	if (fighter_post):
-		# drop all outputs except fighter number
-		dataset.drop(dataset.columns[range(n_features+1,2*n_features)],axis=1, inplace=True)
-	else:
-		# drop all outputs except post type & series
-		dataset.drop(dataset.columns[range(n_features+3,2*n_features)],axis=1, inplace=True)
-		dataset.drop(dataset.columns[n_features],axis=1, inplace=True)
+	if args.lag < 1:
+		# drop columns that don't matter
+		if (fighter_post):
+			# drop all outputs except fighter number
+			dataset.drop(dataset.columns[range(n_features+1,2*n_features)],axis=1, inplace=True)
+		else:
+			# drop all outputs except post type & series
+			dataset.drop(dataset.columns[range(n_features+3,2*n_features)],axis=1, inplace=True)
+			dataset.drop(dataset.columns[n_features],axis=1, inplace=True)
+
 	print(dataset.head())
 
 	if verbosity >= 2:
@@ -125,29 +180,43 @@ def main():
 		print("Test size: " + str(len(test)))
 
 	# organize into [samples,timesteps,features] like keras wants
-	trainX, trainY = create_dataset(train, 1)
-	testX, testY = create_dataset(test, 1)
+	#trainX, trainY = create_dataset(train, args.lag)
+	#testX, testY = create_dataset(test, args.lag)
 
-	# separate inputs and outputs
+	n_obs = args.lag * n_features
+	trainX, testX = train[:,:n_obs], test[:,:n_obs]
 	if fighter_post:
-		trainX = trainX[:,:,:-1]
-		testX = testX[:,:,:-1]
+		trainY, testY = train[:,-n_features], test[:,-n_features]
 	else:
-		trainX = trainX[:,:,:-2]
-		testX = testX[:,:,:-2]
-	trainY = trainY.reshape(-1,2)
-	testY = testY.reshape(-1,2)
+		trainY, testY = train[:,-n_features+1:-n_features+3], test[:,-n_features+1:-n_features+3]
+	# reshape
+	trainX = trainX.reshape((trainX.shape[0],args.lag,n_features))
+	testX = testX.reshape((testX.shape[0],args.lag,n_features))
+	print(trainX.shape,trainY.shape)
+	# separate inputs and outputs
+	#if fighter_post:
+	#	trainX = trainX[:,:,:-1]
+	#	testX = testX[:,:,:-1]
+	#else:
+	#	trainX = trainX[:,:,:-2]
+	#	testX = testX[:,:,:-2]
+	#trainY = trainY.reshape(-1,2)
+	#testY = testY.reshape(-1,2)
 	if verbosity >= 2:
 		print("trainX: ",trainX.shape,"\n",trainX)
 		print("trainY: ",trainY.shape,"\n",trainY)
-	
 	#inp_n = trainX.shape[2]
 
 	# model LSTM network
-	model,hist = model_dataset(trainX,trainY,testX,testY,n_features)
+	model,hist = model_dataset(trainX,trainY,testX,testY,n_features,look_back=args.lag,plot_results=args.plot)
 
 	# make predictions!
-	model_predict(model,testX,testY,recent.reshape(1,1,n_features),scaler,encoders,titles)
+	if args.calc_error:
+		result, error = model_predict(model,testX,testY,recent.reshape(1,args.lag,n_features),scaler,encoders,titles,calc_rmse=args.calc_error)
+	else:
+		result, _ = model_predict(model,testX,testY,recent.reshape(1,args.lag,n_features),scaler,encoders,titles,calc_rmse=args.calc_error)
+
+	return result
 
 # create and train the LSTM network
 def model_dataset(trainX,trainY,testX,testY,n_feats,look_back=1,plot_results=True):
@@ -164,7 +233,7 @@ def model_dataset(trainX,trainY,testX,testY,n_feats,look_back=1,plot_results=Tru
 	else:
 		model.add(Dense(2))
 	model.compile(loss='mae',optimizer='adam')
-	history = model.fit(trainX,trainY,epochs=150,batch_size=1,validation_data=(testX,testY),verbose=0,shuffle=False)
+	history = model.fit(trainX,trainY,epochs=args.epochs,batch_size=args.batch_size,validation_data=(testX,testY),verbose=min([int(verbosity/2),1]),shuffle=False)
 
 	# plot
 	if plot_results:
@@ -175,9 +244,8 @@ def model_dataset(trainX,trainY,testX,testY,n_feats,look_back=1,plot_results=Tru
 
 	return model,history
 
-def model_predict(model,testX,testY,mostrecent,scaler,encoders,titles):
-	calc_rmse = False
-
+def model_predict(model,testX,testY,mostrecent,scaler,encoders,titles,calc_rmse=False):
+	
 	if calc_rmse:
 		# calculate RSME
 		yhat = model.predict(testX,batch_size=1)
@@ -196,10 +264,12 @@ def model_predict(model,testX,testY,mostrecent,scaler,encoders,titles):
 
 	# predict next fighter
 	predicted = model.predict(mostrecent,batch_size=1,verbose=1)
+	#print(predicted)
 	if not fighter_post:
 		# pad with dummy values so it can be descaled
-		dummy = np.append([1],predicted[0],axis=0)
-		dummy = np.append(dummy,[0,0,0,0,0],axis=0)
+		dummy = np.append([0],predicted[0],axis=0)
+		pad = [0]*(len(titles)-3)
+		dummy = np.append(dummy,pad,axis=0)
 		#print(dummy)
 		dummy = scaler.inverse_transform([dummy])
 		predicted = dummy[0,1:3]
@@ -218,26 +288,36 @@ def model_predict(model,testX,testY,mostrecent,scaler,encoders,titles):
 		#if not fighter_post and (feature == "Series" or feature == "Type"):
 		#	predicted[i] = encoder.inverse_transform(predicted[i].astype(int))
 		try:
-			last[i] = encoder.inverse_transform(mostrecent[0,i].astype(int))
+			last[i] = encoder.inverse_transform(mostrecent[-1,i].astype(int))
 		except NotFittedError:
-			last[i] = mostrecent[0,i].astype(int)
+			last[i] = mostrecent[-1,i].astype(int)
 
 	#mostrecent = mostrecent.reshape((len(mostrecent),1))
-	print("Last Posted Fighter: \n",titles)
-	print(" ",last)
+	if verbosity >= 1:
+		print("Last Posted Fighter: \n",titles)
+		print(" ",last)
 
 	if fighter_post:
 		pred_num = predicted[:,0]*66
 		pred_num = pred_num.astype(int)
 		
-		print("Next Predicted Fighter(s): ",pred_num)
-		return rmse,pred_num
+		if verbosity >= 1:
+			print("Next Predicted Fighter(s): ",pred_num)
+		return pred_num,rmse
 	else:
+		#print(predicted)
 		res = np.array([0,0],dtype='object')
 		res[0] = encoders[1].inverse_transform(predicted[0].astype(int))
-		res[1] = encoders[2].inverse_transform(predicted[1].astype(int))
-		print("Prediction: ",res)
-		return rmse,res
+		try:
+			res[1] = encoders[2].inverse_transform(predicted[1].astype(int))
+		except ValueError:
+			if predicted[1].astype(int) == len(encoders[2].classes_):
+				res[1] = "New Series"
+			else:
+				res[1] = "Error: " + str(predicted[1])
+		if verbosity >= 1:
+			print("Prediction: ",res)
+		return res,rmse
 
 def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
 	n_vars = 1 if type(data) is list else data.shape[1]
@@ -325,7 +405,7 @@ def readin(fighterpath='blogdata.csv',itempath='itemdata.csv'):
 # cleans CSV and assigns proper data types
 # returns numpy array of data vectors, without labels
 def parsecsv(data,n):
-	cleandata = np.zeros([1,n])
+	cleandata = np.zeros([1,n],dtype='object')
 	_date = lambda x: datetime.strptime(x, "%m/%d/%y").date()
 	_bool = lambda x: True if x == "True" else False
 	#parsers = [str,int,_date,int,str,_bool,_bool,_bool,int,str,str]
@@ -344,4 +424,19 @@ def workdays(finaldate, refdate = date(2018,6,12)):
 
 
 if __name__ == "__main__":
-	main()
+	results = np.array([],dtype='object')
+	for n in range(args.runs):
+		#if n == 0:
+		#	results = [main()]
+		#else:
+		results = np.append(results,main())
+	#y = [[x,results.count(x)] for x in set(results)]
+	#y.sort(key=lambda x: x[1])
+	u, c = np.unique(results,return_counts=True)
+	y = zip(u, c)
+	N = sum([x[1] for x in y])
+	print("============================")
+	#print(y)
+	for x in y:
+		print("%d.0f%%: %s" %(x[1]*100./N, x[0]))
+	print("============================")
