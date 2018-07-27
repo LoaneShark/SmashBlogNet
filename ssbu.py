@@ -13,6 +13,7 @@ from pandas import DataFrame
 from pandas import concat
 from keras.models import Sequential
 from keras.layers import Dense, LSTM
+import keras.activations as ka
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
@@ -23,13 +24,16 @@ parser.add_argument('-v','--verbosity',type=int,default=0)
 parser.add_argument('-b','--batch_size',type=int,default=1)
 parser.add_argument('-e','--epochs',type=int,default=250)
 parser.add_argument('-l','--lag',type=int,default=1)
-parser.add_argument('-r','--seed',type=int,default=-1)
-parser.add_argument('-n','--runs',type=int,default=1)
+parser.add_argument('-s','--seed',type=int,default=-1)
+parser.add_argument('-n','--n_runs',type=int,default=1)
 parser.add_argument('-f','--fighter_post',action='store_true')
 parser.add_argument('-d','--day_of_week',action='store_true')
 parser.add_argument('-p','--plot',action='store_true')
-parser.add_argument('-s','--supervised',action='store_true')
+parser.add_argument('-u','--unsupervised',action='store_true')
 parser.add_argument('-c','--calc_error',action='store_true')
+parser.add_argument('-r','--retro',action='store_true')
+parser.add_argument('-t','--travel_back',type=int,default=0)
+parser.add_argument('-a','--activation',type=str,default='sigmoid')
 args = parser.parse_args()
 #print(args.verbosity)
 
@@ -41,7 +45,8 @@ if args.seed >= 0:
 verbosity = args.verbosity
 fighter_post = args.fighter_post
 day_of_week = args.day_of_week
-is_supervised = args.supervised
+is_supervised = not(args.unsupervised)
+consolidate_retros = not(args.retro)
 
 # Smash Ultimate Blog Predictor
 def main():
@@ -93,7 +98,6 @@ def main():
 		cleandata = np.append(cleandata,[tempday],axis=0)
 
 	# calculate weekday count for each non-fighter post
-	## TODO: Figure out how to integrate this with fighter posts
 	if day_of_week:
 		others = np.array([np.append(item,[calendar.day_name[item[2].weekday()]]) for item in others])
 	others = np.array([np.append(item[:2],np.append([workdays(item[2],date(2018,6,12))*1.0],item[3:])) for item in others])
@@ -106,8 +110,9 @@ def main():
 				#print(temp)
 				cleandata[idx] = np.array(temp[0])
 
-	#cleandata = [np.array([item for item in others if item[2] == line[2]]) for line in cleandata if line[0]=="None"]
-	#print(cleandata)
+	# remove specified number of days
+	if args.travel_back > 0:
+		cleandata = cleandata[:-args.travel_back]
 
 	data = cleandata[1:]
 	if verbosity >= 3:
@@ -163,7 +168,8 @@ def main():
 			dataset.drop(dataset.columns[range(n_features+3,2*n_features)],axis=1, inplace=True)
 			dataset.drop(dataset.columns[n_features],axis=1, inplace=True)
 
-	print(dataset.head())
+	if verbosity >= 1:
+		print(dataset.head())
 
 	if verbosity >= 2:
 		print("PROCESSED DATASET:\n",dataset)
@@ -192,19 +198,12 @@ def main():
 	# reshape
 	trainX = trainX.reshape((trainX.shape[0],args.lag,n_features))
 	testX = testX.reshape((testX.shape[0],args.lag,n_features))
-	print(trainX.shape,trainY.shape)
-	# separate inputs and outputs
-	#if fighter_post:
-	#	trainX = trainX[:,:,:-1]
-	#	testX = testX[:,:,:-1]
-	#else:
-	#	trainX = trainX[:,:,:-2]
-	#	testX = testX[:,:,:-2]
-	#trainY = trainY.reshape(-1,2)
-	#testY = testY.reshape(-1,2)
-	if verbosity >= 2:
-		print("trainX: ",trainX.shape,"\n",trainX)
-		print("trainY: ",trainY.shape,"\n",trainY)
+
+	if verbosity >= 1:
+		print("trainX: ",trainX.shape)
+		if verbosity >= 2: print(trainX)
+		print("trainY: ",trainY.shape)
+		if verbosity >= 2: print(trainY)
 	#inp_n = trainX.shape[2]
 
 	# model LSTM network
@@ -228,10 +227,11 @@ def model_dataset(trainX,trainY,testX,testY,n_feats,look_back=1,plot_results=Tru
 	# generate and train network
 	model = Sequential()
 	model.add(LSTM(20, input_shape=(look_back,n_feats)))
+	#model.add(LSTM(20, input_shape=(look_back,n_feats)))
 	if fighter_post:
-		model.add(Dense(1))
+		model.add(Dense(1,activation=args.activation))
 	else:
-		model.add(Dense(2))
+		model.add(Dense(2,activation=args.activation))
 	model.compile(loss='mae',optimizer='adam')
 	history = model.fit(trainX,trainY,epochs=args.epochs,batch_size=args.batch_size,validation_data=(testX,testY),verbose=min([int(verbosity/2),1]),shuffle=False)
 
@@ -413,6 +413,9 @@ def parsecsv(data,n):
 
 	for fighter in data:
 		parsed = [parse(inp) for parse,inp in zip(parsers,fighter)]
+		if consolidate_retros:
+			if parsed[-2] in ["Ice Climber", "Gyromite", "Joy Mech Fight", "Excitebike", "Game & Watch", "Duck Hunt"]:
+				parsed[-2] = "Retro"
 		cleandata = np.append(cleandata,[parsed],axis=0)
 
 	return cleandata[1:]
@@ -424,19 +427,21 @@ def workdays(finaldate, refdate = date(2018,6,12)):
 
 
 if __name__ == "__main__":
-	results = np.array([],dtype='object')
-	for n in range(args.runs):
-		#if n == 0:
-		#	results = [main()]
-		#else:
-		results = np.append(results,main())
-	#y = [[x,results.count(x)] for x in set(results)]
-	#y.sort(key=lambda x: x[1])
-	u, c = np.unique(results,return_counts=True)
-	y = zip(u, c)
-	N = sum([x[1] for x in y])
-	print("============================")
-	#print(y)
-	for x in y:
-		print("%d.0f%%: %s" %(x[1]*100./N, x[0]))
-	print("============================")
+	results = np.zeros([1,2],dtype='str')
+	# aggregate results
+	for n in range(args.n_runs):
+		results = np.append(results,[main()],axis=0)
+	results = results[1:]
+
+	# count & sort unique results
+	res = [tuple(row) for row in results]
+	#print(res)
+	u, c = np.unique(res,return_counts=True,axis=0)
+	N = sum([val for val in c])
+
+	# publish results
+	print("||-=-+-=-+-=-+-=-+-=-+-=-+-=-+-=-+-=-")
+	print("||",args.n_runs," function calls: ")
+	for x,y in zip(u,c):
+		print("||%.1f%%: %s" %(y*100./N, x))
+	print("||-=-+-=-+-=-+-=-+-=-+-=-+-=-+-=-+-=-")
