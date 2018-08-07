@@ -19,6 +19,8 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.exceptions import NotFittedError
 
+#python ssbu.py -e 350 -l 5 -d -n 10 -r
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-v','--verbosity',type=int,default=0)
 parser.add_argument('-b','--batch_size',type=int,default=1)
@@ -46,7 +48,7 @@ verbosity = args.verbosity
 fighter_post = args.fighter_post
 day_of_week = args.day_of_week
 is_supervised = not(args.unsupervised)
-consolidate_retros = not(args.retro)
+consolidate_retros = args.retro
 
 # Smash Ultimate Blog Predictor
 def main():
@@ -94,7 +96,7 @@ def main():
 		tempday = np.copy(blankday)
 		tempday[2] = last+i
 		if day_of_week:
-			tempday = tempday.append(tempday,[calendar.day_name[(day_i+i)%7]])
+			tempday = np.append(tempday,[calendar.day_name[(day_i+i)%7]])
 		cleandata = np.append(cleandata,[tempday],axis=0)
 
 	# calculate weekday count for each non-fighter post
