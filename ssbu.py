@@ -412,8 +412,8 @@ def parsecsv(data,n):
 	cleandata = np.zeros([1,n],dtype='object')
 	_date = lambda x: datetime.strptime(x, "%m/%d/%y").date()
 	_bool = lambda x: True if x == "True" else False
-	#parsers = [str,int,_date,int,str,_bool,_bool,_bool,int,str,str]
-	parsers = [str,int,_date,int,str,str,str,str,int,str,str]
+	#parsers = [str,float,_date,int,str,_bool,_bool,_bool,int,str,str]
+	parsers = [str,float,_date,int,str,str,str,str,int,str,str]
 
 	for fighter in data:
 		parsed = [parse(inp) for parse,inp in zip(parsers,fighter)]
