@@ -19,7 +19,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.exceptions import NotFittedError
 
-#python ssbu.py -e 350 -l 5 -d -n 10 -r
+#python ssbu.py -e 350 -l 5 -d -n 10 -r -o
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-v','--verbosity',type=int,default=0)
@@ -34,8 +34,11 @@ parser.add_argument('-p','--plot',action='store_true')
 parser.add_argument('-u','--unsupervised',action='store_true')
 parser.add_argument('-c','--calc_error',action='store_true')
 parser.add_argument('-r','--retro',action='store_true')
-parser.add_argument('-t','--travel_back',type=int,default=0)
+parser.add_argument('-R','--travel_back',type=int,default=0)
+parser.add_argument('-m','--missing_days',type=int,default=0)
 parser.add_argument('-a','--activation',type=str,default='sigmoid')
+parser.add_argument('-t','--third_party',action='store_true')
+parser.add_argument('-o','--company',action='store_true')
 args = parser.parse_args()
 #print(args.verbosity)
 
@@ -49,6 +52,9 @@ fighter_post = args.fighter_post
 day_of_week = args.day_of_week
 is_supervised = not(args.unsupervised)
 consolidate_retros = args.retro
+blank_days = args.missing_days
+group_by_company = args.company
+consolidate_third_parties = args.third_party
 
 # Smash Ultimate Blog Predictor
 def main():
@@ -61,7 +67,7 @@ def main():
 
 	# clean up data and add in missing info
 	last = 0
-	blankday = np.array(["None",-1,None,-1,"None","None","None","None",-1,"None","None"])
+	blankday = np.array(["None",-1,None,-1,"None","None","None","None","None",-1,"None","None"])
 
 	if day_of_week:
 		cleandata = np.zeros((1,fighters.shape[1]+1),dtype='object')
@@ -91,7 +97,10 @@ def main():
 		last = fighter[2]
 	# pad missing days since last blog post 
 	last = cleandata[-1,2]
-	padcount = int(workdays(today)-last)
+	if blank_days == -1:
+		padcount = int(workdays(today)-last)
+	else:
+		padcount = blank_days+1
 	for i in range(1,padcount):
 		tempday = np.copy(blankday)
 		tempday[2] = last+i
@@ -128,9 +137,9 @@ def main():
 	
 	# select just the data columns we want, and reorder them
 	if day_of_week:
-		titles = ['Number','Type','Series','Day of the Week','Weekdays since','Game Added','Game Count','3rd Party?','Newcomer?','Returning Vet?']
+		titles = ['Number','Type','Series','Day of the Week','Weekdays since','Game Added','Game Count','3rd Party?','Returning Vet?','Echo?']
 	else:
-		titles = ['Number','Type','Series','Weekdays since','Game Added','Game Count','3rd Party?','Newcomer?','Returning Vet?']
+		titles = ['Number','Type','Series','Weekdays since','Game Added','Game Count','3rd Party?','Returning Vet?','Echo?']
 	features = np.array([data[:,labelkeys[title]] for title in titles],dtype='object')
 	features = np.array([features[:,i] for i in range(len(data))])
 	
@@ -413,13 +422,43 @@ def parsecsv(data,n):
 	_date = lambda x: datetime.strptime(x, "%m/%d/%y").date()
 	_bool = lambda x: True if x == "True" else False
 	#parsers = [str,float,_date,int,str,_bool,_bool,_bool,int,str,str]
-	parsers = [str,float,_date,int,str,str,str,str,int,str,str]
+	parsers = [str,float,_date,int,str,str,str,str,str,int,str,str]
 
 	for fighter in data:
 		parsed = [parse(inp) for parse,inp in zip(parsers,fighter)]
 		if consolidate_retros:
 			if parsed[-2] in ["Ice Climber", "Gyromite", "Joy Mech Fight", "Excitebike", "Game & Watch", "Duck Hunt"]:
 				parsed[-2] = "Retro"
+		if group_by_company or consolidate_third_parties:
+			if parsed[-2] in ["Castlevania", "Metal Gear","Bomberman","Contra","Dance Dance Revolution","Frogger"]:
+				parsed[-2] = "Konami"
+			if parsed[-2] in ["Pac-Man","Tekken","Digimon","Dig Dug","Tales","Dark Souls","Tetris","Galaga","Klonoa"]:
+				parsed[-2] = "Namco Bandai"
+			if parsed[-2] in ["Mega Man","Street Fighter","Monster Hunter","Ace Attorney","Okami","Devil May Cry","Resident Evil"]:
+				parsed[-2] = "Capcom"
+			if parsed[-2] in ["Crash Bandicoot","Spyro"]:
+				parsed[-2] = "Activision"
+			if parsed[-2] in ["Sonic the Hedgehog","Bayonetta","Virtua Fighter","NiGHTS","Puyo Puyo","Megami Tensei","Shenmue","Persona","Etrian Odyssey","Yakuza","Valkyria Chronicles"]:
+				parsed[-2] = "Sega"
+			if parsed[-2] in ["Minecraft","Halo","Banjo-Kazooie","Conker"]:
+				parsed[-2] = "Microsoft"
+			if parsed[-2] in ["Rayman","Assassin's Creed","Prince of Persia"]:
+				parsed[-2] = "Ubisoft"
+			if parsed[-2] in ["Elder Scrolls","DOOM","Fallout","Wolfenstein"]:
+				parsed[-2] = "Bethesda"
+			if parsed[-2] in ["Final Fantasy","Super Mario RPG","Bravely Default","Octopath Traveler","Dragon Quest","Kingdom Hearts","Chrono Trigger","The World Ends With You","Nier","Tomb Raider"]:
+				parsed[-2] = "Square Enix"
+			if parsed[-2] in ["Professor Layton","Yo-Kai Watch","Ni no Kuni"]:
+				parsed[-2] = "Level-5"
+			if parsed[-2] in ["Overwatch","Diablo","Warcraft","Starcraft","Hearthstone"]:
+				parsed[-2] = "Blizzard"
+			if parsed[-2] in ["Shovel Knight","Shantae","Undertale","Scribblenauts","Cave Story","Celeste","Azure Striker Gunvolt","Tohou","A Hat in Time","Owlboy","Never Alone","Bit Trip","Spelunky","Binding of Isaac","Rivals of Aether","Slap City","Brawlhalla"]:
+				parsed[-2] = "Indie"
+			if parsed[-2] in ["Dragon Ball","My Hero Academia","Naruto","One Piece","Bleach","Yu-Gi-Oh","Fullmetal Alchemist","Death Note","JoJo's Bizzare Adventure"]:
+				parsed[-2] = "Anime"
+		if consolidate_third_parties:
+			if parsed[-2] in ["Konami","Namco Bandai","Capcom","Activision","Sega","Microsoft","Ubisoft","Bethesda","Square Enix","Level-5","Blizzard"]:
+				parsed[-2] = "3rd Party"
 		cleandata = np.append(cleandata,[parsed],axis=0)
 
 	return cleandata[1:]

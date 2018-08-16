@@ -1,29 +1,33 @@
-Name,Number,Date,Days Since E3,Game Added,3rd Party?,Newcomer?,Returning Vet?,Game Count,Series,Type
-Squid Sisters,-1,6/12/18,0,-1,FALSE,N/A,N/A,-1,Splatoon,Assist Trophy
-Launch Star,-1,6/13/18,1,-1,FALSE,N/A,N/A,-1,Super Mario,Item
-Alolan Vulpix,-1,6/14/18,2,-1,FALSE,N/A,N/A,-1,Pokemon,Pokemon
-Battlefield,-1,6/18/18,6,-1,FALSE,N/A,N/A,-1,Smash Bros,Stage
-Black Hole,-1,6/18/18,6,-1,FALSE,N/A,N/A,-1,Kid Icarus,Item
-Bomb Rush Blush,-1,6/19/18,7,-1,FALSE,N/A,N/A,-1,Splatoon,Music
-Bomberman,-1,6/19/18,7,-1,TRUE,N/A,N/A,-1,Bomberman,Assist Trophy
-Noisey Notebook,-1,6/26/18,14,-1,FALSE,N/A,N/A,-1,Snipperclips,Music
-Sukapon,-1,6/26/18,14,-1,FALSE,N/A,N/A,-1,Joy Mech Fight,Assist Trophy
-Solgaleo,-1,6/27/18,15,-1,FALSE,N/A,N/A,-1,Pokemon,Pokemon
-Lunala,-1,6/27/18,15,-1,FALSE,N/A,N/A,-1,Pokemon,Pokemon
-Knuckles,-1,7/1/18,19,-1,TRUE,N/A,N/A,-1,Sonic,Assist Trophy
-City Trial,-1,7/3/18,21,-1,FALSE,N/A,N/A,-1,Kirby,Music
-Kongo Falls,-1,7/3/18,21,-1,FALSE,N/A,N/A,-1,Donkey Kong,Stage
-Krystal,-1,7/4/18,22,-1,FALSE,N/A,N/A,-1,Star Fox,Assist Trophy
-Megaman 4 Medley,-1,7/10/18,28,-1,TRUE,N/A,N/A,-1,Mega Man,Music
-Alolan Raichu,-1,7/10/18,28,-1,FALSE,N/A,N/A,-1,Pokemon,Pokemon
-Moray Towers,-1,7/16/18,34,-1,FALSE,N/A,N/A,-1,Splatoon,Stage
-Snake Eater,-1,7/17/18,35,-1,TRUE,N/A,N/A,-1,Metal Gear,Music
-Wily Castle,-1,7/17/18,35,-1,TRUE,N/A,N/A,-1,Mega Man,Stage
-Bewear,-1,7/19/18,37,-1,FALSE,N/A,N/A,-1,Pokemon,Pokemon
-Great Plateau Tower,-1,7/23/18,41,-1,FALSE,N/A,N/A,-1,Legend of Zelda,Stage
-F-Zero Medley,-1,7/24/18,42,-1,FALSE,N/A,N/A,-1,F-Zero,Music
-Princess Peach's Castle,-1,7/24/18,42,-1,FALSE,N/A,N/A,-1,Super Mario,Stage
-Galaga Medley,-1,7/31/18,49,-1,TRUE,N/A,N/A,-1,Pac-Man,Music
-Lylat Cruise,-1,7/31/18,49,-1,FALSE,N/A,N/A,-1,Star Fox,Stage
-Rodin,-1,8/2/18,51,-1,TRUE,N/A,N/A,-1,Bayonetta,Assist Trophy
-Bomber,-1,8/6/18,55,-1,FALSE,N/A,N/A,-1,Kirby,Item
+Name,Number,Date,Days Since E3,Game Added,3rd Party?,Newcomer?,Returning Vet?,Echo?,Game Count,Series,Type
+Squid Sisters,-1,6/12/18,0,-1,FALSE,N/A,N/A,N/A,-1,Splatoon,Assist Trophy
+Launch Star,-1,6/13/18,1,-1,FALSE,N/A,N/A,N/A,-1,Super Mario,Item
+Alolan Vulpix,-1,6/14/18,2,-1,FALSE,N/A,N/A,N/A,-1,Pokemon,Pokemon
+Battlefield,-1,6/18/18,6,-1,FALSE,N/A,N/A,N/A,-1,Smash Bros,Stage
+Black Hole,-1,6/18/18,6,-1,FALSE,N/A,N/A,N/A,-1,Kid Icarus,Item
+Bomb Rush Blush,-1,6/19/18,7,-1,FALSE,N/A,N/A,N/A,-1,Splatoon,Music
+Bomberman,-1,6/19/18,7,-1,TRUE,N/A,N/A,N/A,-1,Bomberman,Assist Trophy
+Noisey Notebook,-1,6/26/18,14,-1,FALSE,N/A,N/A,N/A,-1,Snipperclips,Music
+Sukapon,-1,6/26/18,14,-1,FALSE,N/A,N/A,N/A,-1,Joy Mech Fight,Assist Trophy
+Solgaleo,-1,6/27/18,15,-1,FALSE,N/A,N/A,N/A,-1,Pokemon,Pokemon
+Lunala,-1,6/27/18,15,-1,FALSE,N/A,N/A,N/A,-1,Pokemon,Pokemon
+Knuckles,-1,7/1/18,19,-1,TRUE,N/A,N/A,N/A,-1,Sonic,Assist Trophy
+City Trial,-1,7/3/18,21,-1,FALSE,N/A,N/A,N/A,-1,Kirby,Music
+Kongo Falls,-1,7/3/18,21,-1,FALSE,N/A,N/A,N/A,-1,Donkey Kong,Stage
+Krystal,-1,7/4/18,22,-1,FALSE,N/A,N/A,N/A,-1,Star Fox,Assist Trophy
+Megaman 4 Medley,-1,7/10/18,28,-1,TRUE,N/A,N/A,N/A,-1,Mega Man,Music
+Alolan Raichu,-1,7/10/18,28,-1,FALSE,N/A,N/A,N/A,-1,Pokemon,Pokemon
+Moray Towers,-1,7/16/18,34,-1,FALSE,N/A,N/A,N/A,-1,Splatoon,Stage
+Snake Eater,-1,7/17/18,35,-1,TRUE,N/A,N/A,N/A,-1,Metal Gear,Music
+Wily Castle,-1,7/17/18,35,-1,TRUE,N/A,N/A,N/A,-1,Mega Man,Stage
+Bewear,-1,7/19/18,37,-1,FALSE,N/A,N/A,N/A,-1,Pokemon,Pokemon
+Great Plateau Tower,-1,7/23/18,41,-1,FALSE,N/A,N/A,N/A,-1,Legend of Zelda,Stage
+F-Zero Medley,-1,7/24/18,42,-1,FALSE,N/A,N/A,N/A,-1,F-Zero,Music
+Princess Peach's Castle,-1,7/24/18,42,-1,FALSE,N/A,N/A,N/A,-1,Super Mario,Stage
+Galaga Medley,-1,7/31/18,49,-1,TRUE,N/A,N/A,N/A,-1,Pac-Man,Music
+Lylat Cruise,-1,7/31/18,49,-1,FALSE,N/A,N/A,N/A,-1,Star Fox,Stage
+Rodin,-1,8/2/18,51,-1,TRUE,N/A,N/A,N/A,-1,Bayonetta,Assist Trophy
+Bomber,-1,8/6/18,55,-1,FALSE,N/A,N/A,N/A,-1,Kirby,Item
+Bloody Tears / Monster Dance,-1,8/8/18,57,-1,TRUE,N/A,N/A,N/A,-1,Castlevania,Music
+Abra,-1,8/13/18,62,-1,FALSE,N/A,N/A,N/A,-1,Pokemon,Pokemon
+GangPlank Galleon,-1,8/14/18,63,-1,FALSE,N/A,N/A,N/A,-1,Donkey Kong,Music
+Dracula's Castle,-1,8/14/18,63,-1,TRUE,N/A,N/A,N/A,-1,Castlevania,Stage
