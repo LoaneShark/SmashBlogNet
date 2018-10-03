@@ -39,6 +39,8 @@ parser.add_argument('-m','--missing_days',type=int,default=0)
 parser.add_argument('-a','--activation',type=str,default='sigmoid')
 parser.add_argument('-t','--third_party',action='store_true')
 parser.add_argument('-o','--company',action='store_true')
+parser.add_argument('-A','--plot_acc',action='store_true')
+parser.add_argument('-T','--show_tail',action='store_true')
 args = parser.parse_args()
 #print(args.verbosity)
 
@@ -55,6 +57,8 @@ consolidate_retros = args.retro
 blank_days = args.missing_days
 group_by_company = args.company
 consolidate_third_parties = args.third_party
+plot_accuracy = args.plot_acc
+peek_tail = args.show_tail
 
 # Smash Ultimate Blog Predictor
 def main():
@@ -101,9 +105,10 @@ def main():
 		padcount = int(workdays(today)-last)
 	else:
 		padcount = blank_days+1
-	for i in range(1,padcount):
+
+	for i in range(0,padcount):
 		tempday = np.copy(blankday)
-		tempday[2] = last+i
+		tempday[2] = last+i+1
 		if day_of_week:
 			tempday = np.append(tempday,[calendar.day_name[(day_i+i)%7]])
 		cleandata = np.append(cleandata,[tempday],axis=0)
@@ -128,6 +133,9 @@ def main():
 	data = cleandata[1:]
 	if verbosity >= 3:
 		print(data.shape,data)
+	elif peek_tail:
+		print("Last 5 elements of dataset...")
+		print(data[-5:])
 
 	labels[2] = 'Weekdays since'
 	# establish mapping for labels to their index
@@ -137,9 +145,9 @@ def main():
 	
 	# select just the data columns we want, and reorder them
 	if day_of_week:
-		titles = ['Number','Type','Series','Day of the Week','Weekdays since','Game Added','Game Count','3rd Party?','Returning Vet?','Echo?']
+		titles = ['Number','Type','Series','Day of the Week','Weekdays since','Game Added','Game Count','3rd Party?']
 	else:
-		titles = ['Number','Type','Series','Weekdays since','Game Added','Game Count','3rd Party?','Returning Vet?','Echo?']
+		titles = ['Number','Type','Series','Weekdays since','Game Added','Game Count','3rd Party?']
 	features = np.array([data[:,labelkeys[title]] for title in titles],dtype='object')
 	features = np.array([features[:,i] for i in range(len(data))])
 	
@@ -249,9 +257,15 @@ def model_dataset(trainX,trainY,testX,testY,n_feats,look_back=1,plot_results=Tru
 	history = model.fit(trainX,trainY,epochs=args.epochs,batch_size=args.batch_size,validation_data=(testX,testY),verbose=min([int(verbosity/2),1]),shuffle=False)
 
 	# plot
+	if plot_accuracy:
+		keystr = "categorical_accuracy"
+	else: keystr = "loss"
 	if plot_results:
-		plt.plot(history.history['loss'],label='train')
-		plt.plot(history.history['val_loss'], label='test')
+		plt.plot(history.history[keystr],label='train')
+		plt.plot(history.history['val_%s' %keystr], label='test')
+		plt.title("%s vs. epoch for train & validation sets" %keystr)
+		plt.xlabel("epoch")
+		plt.ylabel(keystr)
 		plt.legend()
 		plt.show()
 
@@ -424,11 +438,17 @@ def parsecsv(data,n):
 	#parsers = [str,float,_date,int,str,_bool,_bool,_bool,int,str,str]
 	parsers = [str,float,_date,int,str,str,str,str,str,int,str,str]
 
+	# combines low-population subgroups into their heirarchical classifier
 	for fighter in data:
 		parsed = [parse(inp) for parse,inp in zip(parsers,fighter)]
+		# consolidate minor nintendos
+		if parsed[-2] in ["Wii","Nintendo DS","Electroplankton","Wii Sports","Find Mii","Miiverse","Tomodachi","Nintendogs","Snipperclips","Steel Diver","Pilotwings"]:
+			parsed[-2] = "Other Nintendo"
+		# consolidate retros
 		if consolidate_retros:
-			if parsed[-2] in ["Ice Climber", "Gyromite", "Joy Mech Fight", "Excitebike", "Game & Watch", "Duck Hunt"]:
+			if parsed[-2] in ["Ice Climber","Gyromite","Joy Mech Fight","Excitebike","Game & Watch","Duck Hunt","Balloon Fight","Wrecking Crew"]:
 				parsed[-2] = "Retro"
+		# consolidate third parties
 		if group_by_company or consolidate_third_parties:
 			if parsed[-2] in ["Castlevania", "Metal Gear","Bomberman","Contra","Dance Dance Revolution","Frogger"]:
 				parsed[-2] = "Konami"
@@ -438,7 +458,7 @@ def parsecsv(data,n):
 				parsed[-2] = "Capcom"
 			if parsed[-2] in ["Crash Bandicoot","Spyro"]:
 				parsed[-2] = "Activision"
-			if parsed[-2] in ["Sonic the Hedgehog","Bayonetta","Virtua Fighter","NiGHTS","Puyo Puyo","Megami Tensei","Shenmue","Persona","Etrian Odyssey","Yakuza","Valkyria Chronicles"]:
+			if parsed[-2] in ["Sonic The Hedgehog","Bayonetta","Virtua Fighter","NiGHTS","Puyo Puyo","Megami Tensei","Shenmue","Persona","Etrian Odyssey","Yakuza","Valkyria Chronicles"]:
 				parsed[-2] = "Sega"
 			if parsed[-2] in ["Minecraft","Halo","Banjo-Kazooie","Conker"]:
 				parsed[-2] = "Microsoft"
@@ -486,6 +506,7 @@ if __name__ == "__main__":
 
 	# publish results
 	print("||-=-+-=-+-=-+-=-+-=-+-=-+-=-+-=-+-=-")
+	print("|| Prediction for %s" %date.strftime("%A, %m/%d/%Y"))
 	print("||",args.n_runs," function calls: ")
 	for x,y in zip(u,c):
 		print("||%.1f%%: %s" %(y*100./N, x))
