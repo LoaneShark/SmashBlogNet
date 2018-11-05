@@ -488,7 +488,6 @@ def workdays(finaldate, refdate = date(2018,6,12)):
 	daygen = (refdate + timedelta(x + 1) for x in range((finaldate-refdate).days))
 	return sum(1 for day in daygen if day.weekday()<5)
 
-
 if __name__ == "__main__":
 	results = np.zeros([1,2],dtype='str')
 	# aggregate results
