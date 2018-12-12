@@ -472,6 +472,8 @@ def parsecsv(data,n):
 				parsed[-2] = "Level-5"
 			if parsed[-2] in ["Overwatch","Diablo","Warcraft","Starcraft","Hearthstone"]:
 				parsed[-2] = "Blizzard"
+			if parsed[-2] in ["Fatal Frame","Dead or Alive","Ninja Gaiden","Nioh","Dynasty Warriors","Atelier","Nobunaga's Ambition","WinBack","Neoromance","Romance of the Three Kingdoms","Kessen","Gitaroo Man","Captain Tsubasa","Gallop Racer","Monster Rancher","Winning Post","Star Force"]
+				parsed[-2] = "Koei Tecmo"
 			if parsed[-2] in ["Shovel Knight","Shantae","Undertale","Scribblenauts","Cave Story","Celeste","Azure Striker Gunvolt","Tohou","A Hat in Time","Owlboy","Never Alone","Bit Trip","Spelunky","Binding of Isaac","Rivals of Aether","Slap City","Brawlhalla"]:
 				parsed[-2] = "Indie"
 			if parsed[-2] in ["Dragon Ball","My Hero Academia","Naruto","One Piece","Bleach","Yu-Gi-Oh","Fullmetal Alchemist","Death Note","JoJo's Bizzare Adventure"]:
